@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — FB Automation</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="brand">FB AUTOMATION</div>
+      <div class="brand-sub">Page Content Manager</div>
+      <div class="nav" id="nav"></div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="muted">Overview</p>
+        </div>
+        <div>
+          <span class="pill green" id="statusPill">checking…</span>
+          <button class="secondary" onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="stat">
+          <div class="muted">Pages</div>
+          <div class="num" id="pagesCount">—</div>
+        </div>
+        <div class="stat">
+          <div class="muted">Account</div>
+          <div class="num" id="accountName" style="font-size:16px;">—</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2>Quick actions</h2>
+        <p class="muted">Sync your Pages, then head to Upload to publish.</p>
+        <button onclick="syncPages()">Sync Pages</button>
+        <a href="/upload.html" class="btn secondary" style="text-decoration:none; margin-left:8px; display:inline-block;">Go to Upload</a>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log">Ready.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderNav("dashboard");
+
+    // Handle the OAuth callback redirect: /dashboard.html?fbUserId=...
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("fbUserId")) {
+      setFbUserId(urlParams.get("fbUserId"));
+      window.history.replaceState({}, "", "/dashboard.html");
+    }
+
+    const fbUserId = requireSession();
+
+    function log(line) {
+      const el = document.getElementById("log");
+      el.textContent += "\n" + line;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function logout() {
+      clearSession();
+      window.location.href = "/index.html";
+    }
+
+    async function loadStatus() {
+      try {
+        const status = await apiGet(`/auth/status/${fbUserId}`);
+        document.getElementById("statusPill").textContent = status.connected
+          ? "FB Connected"
+          : "Not connected";
+        document.getElementById("accountName").textContent = status.name || "—";
+        document.getElementById("pagesCount").textContent = status.pagesCount ?? 0;
+      } catch (e) {
+        log("Error: " + e.message);
+      }
+    }
+
+    async function syncPages() {
+      log("Syncing pages...");
+      try {
+        const data = await apiGet(`/pages/${fbUserId}/sync`);
+        log(`✓ Synced ${data.count} page(s).`);
+        loadStatus();
+      } catch (e) {
+        log("✗ Sync failed: " + e.message);
+      }
+    }
+
+    if (fbUserId) loadStatus();
+  </script>
+</body>
+</html>

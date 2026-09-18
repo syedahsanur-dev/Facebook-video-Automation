@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FB Automation — Connect</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="center-screen">
+    <div class="card login-card">
+      <h1>FB AUTOMATION</h1>
+      <p class="muted" style="margin-bottom:20px;">Page Content Manager</p>
+
+      <div id="msg" class="warn" style="display:none; margin-bottom:12px;"></div>
+
+      <a href="/auth/facebook" class="btn" style="display:block; text-align:center; text-decoration:none; margin-bottom:16px;">
+        Login with Facebook
+      </a>
+      <p class="muted" style="text-align:center; margin: 8px 0;">— or —</p>
+
+      <label for="token">Paste a Facebook User Access Token (advanced / testing)</label>
+      <textarea id="token" rows="3" placeholder="EAAG..."></textarea>
+      <button id="connectBtn" style="width:100%;">Connect with token</button>
+
+      <p class="muted" style="margin-top:16px;">
+        Server-side login requires your own Meta App ID/Secret configured in
+        <code>.env</code>, with this domain's callback URL whitelisted in the
+        Meta App's OAuth settings.
+      </p>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    // If we just came back from the OAuth callback, dashboard.html?fbUserId=...
+    // already handles saving the id — this page is only for the manual entry path.
+
+    document.getElementById("connectBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      const token = document.getElementById("token").value.trim();
+      msg.style.display = "none";
+      if (!token) return;
+      try {
+        const data = await apiPostJSON("/auth/facebook/token", { accessToken: token });
+        setFbUserId(data.fbUserId);
+        window.location.href = "/dashboard.html";
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>

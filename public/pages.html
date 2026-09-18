@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pages — FB Automation</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="brand">FB AUTOMATION</div>
+      <div class="brand-sub">Page Content Manager</div>
+      <div class="nav" id="nav"></div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <h1>Pages</h1>
+          <p class="muted" id="subtitle">Connected Facebook Pages</p>
+        </div>
+        <button onclick="syncPages()">Sync Pages</button>
+      </div>
+
+      <div class="card">
+        <div id="pageList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderNav("pages");
+    const fbUserId = requireSession();
+
+    async function loadPages() {
+      try {
+        const data = await apiGet(`/pages/${fbUserId}`);
+        document.getElementById("subtitle").textContent = `${data.count} connected Facebook Pages`;
+        renderPages(data.pages);
+      } catch (e) {
+        document.getElementById("pageList").innerHTML =
+          `<p class="warn">No pages synced yet. Click "Sync Pages".</p>`;
+      }
+    }
+
+    async function syncPages() {
+      try {
+        const data = await apiGet(`/pages/${fbUserId}/sync`);
+        document.getElementById("subtitle").textContent = `${data.count} connected Facebook Pages`;
+        renderPages(data.pages);
+      } catch (e) {
+        alert("Sync failed: " + e.message);
+      }
+    }
+
+    function renderPages(pages) {
+      const el = document.getElementById("pageList");
+      if (!pages || !pages.length) {
+        el.innerHTML = `<p class="muted">No pages found.</p>`;
+        return;
+      }
+      el.innerHTML = pages
+        .map(
+          (p) => `
+        <div class="page-item">
+          <div>
+            <strong>${p.name}</strong>
+            <div class="muted">${p.followers ?? 0} followers • ${p.category || "Page"} • ID: ${p.id}</div>
+          </div>
+        </div>`
+        )
+        .join("");
+    }
+
+    if (fbUserId) loadPages();
+  </script>
+</body>
+</html>

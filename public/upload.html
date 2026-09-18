@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Upload — FB Automation</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="brand">FB AUTOMATION</div>
+      <div class="brand-sub">Page Content Manager</div>
+      <div class="nav" id="nav"></div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <h1>Upload</h1>
+          <p class="muted">Create and publish to a Facebook Page</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="pageSelect">Page</label>
+        <select id="pageSelect"></select>
+
+        <div class="tabs">
+          <button data-type="post" class="active">Post</button>
+          <button data-type="photo">Photo</button>
+          <button data-type="video">Video</button>
+          <button data-type="reel">Reel</button>
+        </div>
+
+        <label for="caption">Caption / message</label>
+        <textarea id="caption" rows="3" placeholder="Write something..."></textarea>
+
+        <div id="linkField">
+          <label for="link">Link (post type only)</label>
+          <input id="link" placeholder="https://..." />
+        </div>
+
+        <div id="fileField" style="display:none;">
+          <label for="file">Media file</label>
+          <input type="file" id="file" />
+        </div>
+
+        <label for="schedule">Schedule (optional — leave blank to publish now)</label>
+        <input type="datetime-local" id="schedule" />
+
+        <div id="countryField">
+          <label>Country targeting (optional, organic posts only — country-level only, see note below)</label>
+          <input id="countries" placeholder="e.g. US, BD (comma separated country codes)" />
+        </div>
+
+        <p class="warn" style="margin: 4px 0 16px;">
+          Note: division/state-level geo-targeting for organic posts is not
+          supported by the Graph API — only broad country targeting on large
+          Pages works reliably. True region-level delivery control requires
+          the paid Marketing API (ads), not this publishing endpoint.
+        </p>
+
+        <button id="publishBtn">Publish</button>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log">Ready.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderNav("upload");
+    const fbUserId = requireSession();
+    let currentType = "post";
+
+    function log(line) {
+      const el = document.getElementById("log");
+      el.textContent += "\n" + line;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    document.querySelectorAll(".tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentType = btn.dataset.type;
+        document.getElementById("fileField").style.display = currentType === "post" ? "none" : "block";
+        document.getElementById("linkField").style.display = currentType === "post" ? "block" : "none";
+        document.getElementById("countryField").style.display = currentType === "post" ? "block" : "none";
+      });
+    });
+
+    async function loadPagesIntoSelect() {
+      try {
+        const data = await apiGet(`/pages/${fbUserId}`);
+        const sel = document.getElementById("pageSelect");
+        sel.innerHTML = data.pages
+          .map((p) => `<option value="${p.id}">${p.name}</option>`)
+          .join("");
+        if (!data.pages.length) log("No pages synced yet — go to Pages and click Sync.");
+      } catch (e) {
+        log("Could not load pages: " + e.message);
+      }
+    }
+
+    function scheduledUnixTime() {
+      const val = document.getElementById("schedule").value;
+      if (!val) return null;
+      return Math.floor(new Date(val).getTime() / 1000);
+    }
+
+    document.getElementById("publishBtn").addEventListener("click", async () => {
+      const pageId = document.getElementById("pageSelect").value;
+      if (!pageId) return log("Pick a page first.");
+      const caption = document.getElementById("caption").value;
+      const sched = scheduledUnixTime();
+
+      try {
+        log(`Publishing ${currentType}...`);
+        let result;
+
+        if (currentType === "post") {
+          const countriesRaw = document.getElementById("countries").value.trim();
+          const countries = countriesRaw
+            ? countriesRaw.split(",").map((c) => c.trim()).filter(Boolean)
+            : undefined;
+          result = await apiPostJSON("/upload/post", {
+            fbUserId,
+            pageId,
+            message: caption,
+            link: document.getElementById("link").value || undefined,
+            scheduledUnixTime: sched || undefined,
+            countries,
+          });
+        } else {
+          const fileInput = document.getElementById("file");
+          if (!fileInput.files.length) return log("Choose a file first.");
+          const form = new FormData();
+          form.append("fbUserId", fbUserId);
+          form.append("pageId", pageId);
+          form.append("file", fileInput.files[0]);
+          if (currentType === "photo") form.append("caption", caption);
+          else form.append("description", caption);
+          if (sched) form.append("scheduledUnixTime", sched);
+
+          result = await apiPostForm(`/upload/${currentType}`, form);
+        }
+
+        log("✓ Published: " + JSON.stringify(result));
+      } catch (e) {
+        log("✗ Failed: " + e.message);
+      }
+    });
+
+    if (fbUserId) loadPagesIntoSelect();
+  </script>
+</body>
+</html>
